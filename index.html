@@ -370,6 +370,63 @@
   table.detail td.col-date{ white-space: nowrap; color: var(--muted); font-weight: 600; }
   table.detail td.col-legenda{ min-width: 260px; white-space: pre-line; }
   table.detail td.col-resp{ white-space: nowrap; }
+
+  table.detail td.col-done{
+    text-align:center;
+    white-space: nowrap;
+  }
+  .done-checkbox{
+    width: 18px;
+    height: 18px;
+    accent-color: #1A7A4A;
+    cursor: pointer;
+  }
+  table.detail tr.is-done td{
+    background: #F0FAF4 !important;
+    opacity: 0.68;
+  }
+  table.detail tr.is-done td.col-legenda,
+  table.detail tr.is-done td.col-fmt,
+  table.detail tr.is-done td.col-pilar{
+    text-decoration: line-through;
+    text-decoration-color: #1A7A4A66;
+  }
+
+  .progress-bar-wrap{
+    display:flex;
+    align-items:center;
+    gap: 12px;
+    margin-bottom: 14px;
+    font-size: 12.5px;
+    color: var(--muted);
+  }
+  .progress-track{
+    flex: 1;
+    max-width: 260px;
+    height: 8px;
+    border-radius: 6px;
+    background: var(--chip-bg);
+    overflow: hidden;
+  }
+  .progress-fill{
+    height: 100%;
+    background: #1A7A4A;
+    border-radius: 6px;
+    transition: width 0.25s ease;
+  }
+  .progress-reset{
+    appearance:none;
+    border: 1px solid var(--line);
+    background: var(--surface);
+    color: var(--muted);
+    font-family: "Poppins", sans-serif;
+    font-size: 11px;
+    font-weight: 600;
+    padding: 5px 11px;
+    border-radius: 8px;
+    cursor: pointer;
+  }
+  .progress-reset:hover{ color: var(--ink); border-color: var(--faint); }
   .resp-pill{
     display:inline-block;
     font-size: 10.5px;
@@ -504,11 +561,16 @@
   </section>
 
   <section id="panel-detalhamento" class="tab-panel">
+    <div class="progress-bar-wrap">
+      <span id="progress-label">0 de 46 já captados/publicados</span>
+      <div class="progress-track"><div class="progress-fill" id="progress-fill" style="width:0%"></div></div>
+      <button class="progress-reset" id="progress-reset">Limpar marcações</button>
+    </div>
     <div class="table-scroll">
       <table class="detail" id="detail-table">
         <thead>
           <tr>
-            <th>Semana</th><th>Data</th><th>Horário</th><th>Pilar</th><th>Formato</th>
+            <th>Feito</th><th>Semana</th><th>Data</th><th>Horário</th><th>Pilar</th><th>Formato</th>
             <th>Complemento</th><th>Objetivo</th><th>Legenda / Hook</th><th>CTA</th>
             <th>Responsável</th><th>Guia do Shooting</th>
           </tr>
@@ -674,10 +736,45 @@ function respPillClass(resp){
   return `resp-pill ${cat}`;
 }
 
+const DONE_KEY = "vincla_fernanda_shooting_done";
+
+function loadDoneSet(){
+  try{
+    const raw = localStorage.getItem(DONE_KEY);
+    return raw ? new Set(JSON.parse(raw)) : new Set();
+  }catch(e){
+    return new Set();
+  }
+}
+
+function saveDoneSet(set){
+  try{
+    localStorage.setItem(DONE_KEY, JSON.stringify(Array.from(set)));
+  }catch(e){ /* localStorage indisponível — segue sem salvar */ }
+}
+
+function postId(p){
+  return `${p.semana}__${p.date}__${p.hora}`;
+}
+
+let doneSet = loadDoneSet();
+
+function updateProgress(){
+  const total = DATA.posts.length;
+  const done = doneSet.size;
+  const pct = total ? Math.round((done / total) * 100) : 0;
+  document.getElementById("progress-label").textContent = `${done} de ${total} já captados/publicados`;
+  document.getElementById("progress-fill").style.width = `${pct}%`;
+}
+
 function renderDetailTable(){
   const tbody = document.querySelector("#detail-table tbody");
-  const rows = DATA.posts.map(p => `
-    <tr>
+  const rows = DATA.posts.map(p => {
+    const id = postId(p);
+    const isDone = doneSet.has(id);
+    return `
+    <tr data-id="${escapeHtml(id)}" class="${isDone ? "is-done" : ""}">
+      <td class="col-done"><input type="checkbox" class="done-checkbox" ${isDone ? "checked" : ""}></td>
       <td class="col-date">${escapeHtml(p.semana)}<br>${escapeHtml(p.date)}</td>
       <td class="col-date">${escapeHtml(p.hora)}</td>
       <td class="col-pilar">${escapeHtml(p.pilar)}</td>
@@ -688,9 +785,35 @@ function renderDetailTable(){
       <td>${escapeHtml(p.cta || "")}</td>
       <td class="col-resp"><span class="${respPillClass(p.resp)}">${escapeHtml(p.resp)}</span></td>
       <td>${escapeHtml(p.guia || "")}</td>
-    </tr>`).join("");
+    </tr>`;
+  }).join("");
   tbody.innerHTML = rows;
+
+  tbody.querySelectorAll(".done-checkbox").forEach(cb => {
+    cb.addEventListener("change", (e) => {
+      const tr = e.target.closest("tr");
+      const id = tr.dataset.id;
+      if (e.target.checked){
+        doneSet.add(id);
+        tr.classList.add("is-done");
+      } else {
+        doneSet.delete(id);
+        tr.classList.remove("is-done");
+      }
+      saveDoneSet(doneSet);
+      updateProgress();
+    });
+  });
+
+  updateProgress();
 }
+
+document.getElementById("progress-reset").addEventListener("click", () => {
+  if (!confirm("Limpar todas as marcações de 'feito'? Essa ação não pode ser desfeita.")) return;
+  doneSet = new Set();
+  saveDoneSet(doneSet);
+  renderDetailTable();
+});
 
 /* ---------- Premissas ---------- */
 function renderPremissas(){
