@@ -859,7 +859,7 @@ function postId(p){
   return `${p.semana}__${p.date}__${p.hora}`;
 }
 
-const DEFAULT_DONE_DATES = {"26/ago":true, "29/ago":true, "30/ago":true, "31/ago":true, "01/set":true, "03/set":true, "05/set":true};
+const DEFAULT_DONE_DATES = {"26/ago":true, "29/ago":true, "30/ago":true, "31/ago":true, "01/set":true, "03/set":true, "05/set":true, "06/set":true, "09/set":true, "10/set":true, "14/set":true, "16/set":true};
 
 function getInitialDoneSet(){
   // sempre garante que os posts até a data de corte estejam marcados como feitos,
@@ -882,9 +882,21 @@ function updateProgress(){
   document.getElementById("progress-fill").style.width = `${pct}%`;
 }
 
+const MONTH_ORDER_MAP = {"ago": 8, "set": 9, "out": 10, "nov": 11};
+function chronoSort(posts){
+  return [...posts].sort((a, b) => {
+    const [da, ma] = a.date.split("/");
+    const [db, mb] = b.date.split("/");
+    const ka = MONTH_ORDER_MAP[ma] * 100 + parseInt(da);
+    const kb = MONTH_ORDER_MAP[mb] * 100 + parseInt(db);
+    if (ka !== kb) return ka - kb;
+    return parseInt(a.hora) - parseInt(b.hora);
+  });
+}
+
 function renderDetailTable(){
   const tbody = document.querySelector("#detail-table tbody");
-  const rows = DATA.posts.map(p => {
+  const rows = chronoSort(DATA.posts).map(p => {
     const id = postId(p);
     const isDone = doneSet.has(id);
     return `
